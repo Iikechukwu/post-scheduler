@@ -35,7 +35,7 @@ class SocialMediaApp:
             st.rerun()
 
     def run(self):
-        st.title("📱 Content Strategy Dashboard")
+        st.title("📱 Social Media Post Scheduler")
 
         # Metrics Section
         stats = self.db.get_stats()
@@ -65,7 +65,7 @@ class SocialMediaApp:
             d = st.date_input("Schedule Date", datetime.now())
             t = st.time_input("Schedule Time", datetime.now())
             
-            if st.button("🚀 Save Post"):
+            if st.button("🚀Post"):
                 final_img = selected_img
                 if source == "Upload from PC" and local_file:
                     final_img = os.path.join("uploads", local_file.name)
@@ -74,3 +74,43 @@ class SocialMediaApp:
                 self.db.add_post(d.strftime("%Y-%m-%d"), t.strftime("%H:%M"), cap, final_img, cat)
                 st.success("Saved!")
                 st.rerun()
+
+        with col_pre:
+            st.subheader("Preview")
+            if source == "Upload from PC" and local_file:
+                st.image(local_file, use_container_width=True)
+            else:
+                st.image(selected_img, use_container_width=True)
+
+        # Feed Section
+        st.divider()
+        st.subheader("🗓️ Content Calendar")
+        search_term = st.text_input("🔍 Search your posts...", placeholder="Keyword or category...")
+        
+        posts = self.db.search_posts(search_term) if search_term else self.db.get_all_posts()
+
+        if not posts:
+            st.write("No matching posts found.")
+        else:
+            for post in posts:
+                p_id, p_date, p_time, p_cap, p_img, p_status, p_cat = post
+                with st.container(border=True):
+                    c1, c2, c3 = st.columns([1, 2, 1])
+                    with c1:
+                        st.image(p_img, use_container_width=True)
+                    with c2:
+                        badge_color = "green" if p_status == "Published" else "orange"
+                        st.markdown(f":{badge_color}[**{p_status}**] | `{p_cat}`")
+                        st.write(f"📅 **{p_date}** at **{p_time}**")
+                        st.write(p_cap)
+                    with c3:
+                        if st.button("✏️ Edit", key=f"ed_{p_id}"):
+                            self.edit_modal(p_id, p_cap, p_date, p_time)
+                        if st.button("🗑️ Delete", key=f"del_{p_id}"):
+                            self.db.delete_post(p_id)
+                            st.rerun()
+
+# Execute the application
+if __name__ == "__main__":
+    app = SocialMediaApp()
+    app.run()
