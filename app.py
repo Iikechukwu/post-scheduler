@@ -33,3 +33,44 @@ class SocialMediaApp:
         if st.button("Save Changes"):
             self.db.update_post(post_id, new_d.strftime("%Y-%m-%d"), new_t.strftime("%H:%M"), new_cap)
             st.rerun()
+
+    def run(self):
+        st.title("📱 Content Strategy Dashboard")
+
+        # Metrics Section
+        stats = self.db.get_stats()
+        s1, s2, s3 = st.columns(3)
+        s1.metric("Total Content", sum(stats.values()))
+        s2.metric("Scheduled", stats.get('Scheduled', 0))
+        s3.metric("Live Posts", stats.get('Published', 0))
+
+        st.divider()
+
+        # Input Section
+        st.sidebar.header("🔍 Unsplash Search")
+        query = st.sidebar.text_input("Find inspiration", "Minimalism")
+        selected_img = self.api.fetch_image(query)
+
+        col_in, col_pre = st.columns(2)
+        with col_in:
+            st.subheader("New Post")
+            cap = st.text_area("What's on your mind?")
+            cat = st.selectbox("Category", ["Marketing", "Personal", "Educational", "Meme"])
+            source = st.radio("Image Source", ["Unsplash Search", "Upload from PC"])
+            
+            local_file = None
+            if source == "Upload from PC":
+                local_file = st.file_uploader("Upload Image", type=["jpg", "png", "jpeg"])
+            
+            d = st.date_input("Schedule Date", datetime.now())
+            t = st.time_input("Schedule Time", datetime.now())
+            
+            if st.button("🚀 Save Post"):
+                final_img = selected_img
+                if source == "Upload from PC" and local_file:
+                    final_img = os.path.join("uploads", local_file.name)
+                    with open(final_img, "wb") as f:
+                        f.write(local_file.getbuffer())
+                self.db.add_post(d.strftime("%Y-%m-%d"), t.strftime("%H:%M"), cap, final_img, cat)
+                st.success("Saved!")
+                st.rerun()
