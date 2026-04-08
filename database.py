@@ -1,5 +1,6 @@
 import sqlite3
 import datetime
+from facebook_service import FacebookService
 
 class DatabaseManager:
     def __init__(self, db_name="scheduler.db"):
@@ -13,8 +14,17 @@ class DatabaseManager:
                          (id INTEGER PRIMARY KEY AUTOINCREMENT, 
                           date TEXT, time TEXT, caption TEXT, image TEXT, 
                           status TEXT DEFAULT 'Scheduled',
-                          category TEXT DEFAULT 'General')''')
+                          category TEXT DEFAULT 'General',
+                          facebook_post_id TEXT,
+                          error_message TEXT)''')
             conn.commit()
+            # Add columns if they don't exist (for existing databases)
+            try:
+                c.execute("ALTER TABLE posts ADD COLUMN facebook_post_id TEXT")
+                c.execute("ALTER TABLE posts ADD COLUMN error_message TEXT")
+                conn.commit()
+            except:
+                pass
 
     def add_post(self, date, time, caption, image, category="General"):
         with sqlite3.connect(self.db_name) as conn:
@@ -52,10 +62,26 @@ class DatabaseManager:
         now = datetime.datetime.now()
         curr_date = now.strftime("%Y-%m-%d")
         curr_time = now.strftime("%H:%M")
+        fb_service = FacebookService()
+        
         with sqlite3.connect(self.db_name) as conn:
             c = conn.cursor()
-            c.execute("UPDATE posts SET status='Published' WHERE status='Scheduled' AND (date < ? OR (date = ? AND time <= ?))", 
+            # Find posts that are due
+            c.execute("SELECT id, caption, image FROM posts WHERE status='Scheduled' AND (date < ? OR (date = ? AND time <= ?))", 
                       (curr_date, curr_date, curr_time))
+            due_posts = c.fetchall()
+            
+            for post_id, caption, image_url in due_posts:
+                # Attempt to post to Facebook
+                success, fb_post_id, error = fb_service.post_to_feed(caption, image_url)
+                
+                if success:
+                    c.execute("UPDATE posts SET status='Published', facebook_post_id=? WHERE id=?", 
+                              (fb_post_id, post_id))
+                else:
+                    c.execute("UPDATE posts SET status='Failed', error_message=? WHERE id=?", 
+                              (error, post_id))
+            
             conn.commit()
 
     def search_posts(self, query):

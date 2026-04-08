@@ -25,6 +25,26 @@ class SocialMediaApp:
             scheduler.start()
             st.session_state.scheduler_started = True
 
+    def safe_load_image(self, image_path):
+        """Load image safely, handling both URLs and local file paths."""
+        if not image_path:
+            return None
+        
+        # If it's a URL (starts with http)
+        if isinstance(image_path, str) and image_path.startswith("http"):
+            return image_path
+        
+        # If it's a local file path
+        if isinstance(image_path, str):
+            full_path = os.path.join(os.getcwd(), image_path)
+            if os.path.exists(full_path):
+                return full_path
+            elif os.path.exists(image_path):
+                return image_path
+        
+        # Return placeholder if file not found
+        return "https://via.placeholder.com/400x300?text=Image+Not+Found"
+
     @st.dialog("Edit Post")
     def edit_modal(self, post_id, old_cap, old_date, old_time):
         new_cap = st.text_area("Update Caption", value=old_cap)
@@ -78,9 +98,9 @@ class SocialMediaApp:
         with col_pre:
             st.subheader("Preview")
             if source == "Upload from PC" and local_file:
-                st.image(local_file, use_container_width=True)
+                st.image(local_file, use_column_width=True)
             else:
-                st.image(selected_img, use_container_width=True)
+                st.image(selected_img, use_column_width=True)
 
         # Feed Section
         st.divider()
@@ -93,16 +113,38 @@ class SocialMediaApp:
             st.write("No matching posts found.")
         else:
             for post in posts:
-                p_id, p_date, p_time, p_cap, p_img, p_status, p_cat = post
+                # Handle both old (7-col) and new (9-col) schema
+                if len(post) >= 9:
+                    p_id, p_date, p_time, p_cap, p_img, p_status, p_cat, p_fb_id, p_error = post[:9]
+                else:
+                    p_id, p_date, p_time, p_cap, p_img, p_status, p_cat = post
+                    p_fb_id, p_error = None, None
+                
                 with st.container(border=True):
                     c1, c2, c3 = st.columns([1, 2, 1])
                     with c1:
-                        st.image(p_img, use_container_width=True)
+                        img_path = self.safe_load_image(p_img)
+                        st.image(img_path, use_column_width=True)
                     with c2:
-                        badge_color = "green" if p_status == "Published" else "orange"
-                        st.markdown(f":{badge_color}[**{p_status}**] | `{p_cat}`")
+                        if p_status == "Published":
+                            badge_color = "green"
+                            status_text = "✅ Published"
+                        elif p_status == "Failed":
+                            badge_color = "red"
+                            status_text = "❌ Failed"
+                        else:
+                            badge_color = "orange"
+                            status_text = "⏳ Scheduled"
+                        
+                        st.markdown(f":{badge_color}[**{status_text}**] | `{p_cat}`")
                         st.write(f"📅 **{p_date}** at **{p_time}**")
                         st.write(p_cap)
+                        
+                        if p_status == "Published" and p_fb_id:
+                            st.caption(f"📱 Facebook ID: {p_fb_id}")
+                        elif p_status == "Failed" and p_error:
+                            st.error(f"Post failed: {p_error}")
+                    
                     with c3:
                         if st.button("✏️ Edit", key=f"ed_{p_id}"):
                             self.edit_modal(p_id, p_cap, p_date, p_time)
