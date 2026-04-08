@@ -98,9 +98,9 @@ class SocialMediaApp:
         with col_pre:
             st.subheader("Preview")
             if source == "Upload from PC" and local_file:
-                st.image(local_file, use_column_width=True)
+                st.image(local_file, use_container_width=True)
             else:
-                st.image(selected_img, use_column_width=True)
+                st.image(selected_img, use_container_width=True)
 
         # Feed Section
         st.divider()
@@ -124,7 +124,7 @@ class SocialMediaApp:
                     c1, c2, c3 = st.columns([1, 2, 1])
                     with c1:
                         img_path = self.safe_load_image(p_img)
-                        st.image(img_path, use_column_width=True)
+                        st.image(img_path, use_container_width=True)
                     with c2:
                         if p_status == "Published":
                             badge_color = "green"
